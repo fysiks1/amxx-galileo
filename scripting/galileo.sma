@@ -1,9 +1,5 @@
-new const PLUGIN_VERSION[]  = "1.1 $Revision: 290 $"; // $Date: 2009-02-26 11:20:25 -0500 (Thu, 26 Feb 2009) $;
-
 #include <amxmodx>
 #include <amxmisc>
-
-#pragma semicolon 1
 
 #define TASKID_EMPTYSERVER	98176977
 #define TASKID_REMINDER			52691153
@@ -34,7 +30,7 @@ new const PLUGIN_VERSION[]  = "1.1 $Revision: 290 $"; // $Date: 2009-02-26 11:20
 #define MAX_PREFIX_CNT			32
 #define MAX_RECENT_MAP_CNT	16
 
-#define MAX_PLAYER_CNT				32
+#define PLAYER_DIMENSION_SIZE				33
 #define MAX_STANDARD_MAP_CNT	25
 #define MAX_MAPNAME_LEN				31
 #define MAX_MAPS_IN_VOTE			8
@@ -71,7 +67,14 @@ new bool:g_wasLastRound = false;
 new g_mapPrefix[MAX_PREFIX_CNT][16], g_mapPrefixCnt = 1;
 new g_currentMap[MAX_MAPNAME_LEN+1], Float:g_originalTimelimit = TIMELIMIT_NOT_SET;
 
-new g_nomination[MAX_PLAYER_CNT + 1][MAX_NOMINATION_CNT + 1], g_nominationCnt, g_nominationMatchesMenu[MAX_PLAYER_CNT];
+new g_PlayerNominations[PLAYER_DIMENSION_SIZE][MAX_NOMINATION_CNT], g_iNominatedMapsMaxIndex, g_nominationMatchesMenu[PLAYER_DIMENSION_SIZE];
+enum MapTally {
+	MapID,
+	Tally
+}
+new g_NominatedMaps[50][MapTally]
+#define IsValidNomination(%1) (g_NominatedMaps[%1][MapID] >= 0 && g_NominatedMaps[%1][Tally] > 0)
+
 //new g_nonOverlapHudSync;
 
 new g_voteWeightFlags[32];
@@ -84,16 +87,16 @@ new g_recentMap[MAX_RECENT_MAP_CNT][MAX_MAPNAME_LEN + 1], g_cntRecentMap;
 new Array:g_nominationMap, g_nominationMapCnt;
 new Array:g_fillerMap;
 new Float:g_rtvWait;
-new bool:g_rockedVote[MAX_PLAYER_CNT + 1], g_rockedVoteCnt;
+new bool:g_rockedVote[PLAYER_DIMENSION_SIZE], g_rockedVoteCnt;
 
-new g_mapChoice[MAX_MAPS_IN_VOTE + 1][MAX_MAPNAME_LEN + 1], g_choiceCnt, g_choiceMax;
-new bool:g_voted[MAX_PLAYER_CNT + 1] = {true, ...}, g_mapVote[MAX_MAPS_IN_VOTE + 1];
+new g_mapChoice[MAX_MAPS_IN_VOTE + 1][MAX_MAPNAME_LEN + 2], g_choiceCnt, g_choiceMax;
+new bool:g_voted[PLAYER_DIMENSION_SIZE] = {true, ...}, g_mapVote[MAX_MAPS_IN_VOTE + 1];
 new g_voteStatus, g_voteDuration, g_votesCast;
 new g_runoffChoice[2];
 new g_vote[512];
 new bool:g_handleMapChange = true;
 
-new g_refreshVoteStatus = true, g_voteTallyType[3], g_snuffDisplay[MAX_PLAYER_CNT + 1];
+new g_refreshVoteStatus = true, g_voteTallyType[3], g_snuffDisplay[PLAYER_DIMENSION_SIZE];
 
 new g_menuChooseMap;
 
@@ -114,16 +117,12 @@ new cvar_emptyWait, cvar_emptyMapFile, cvar_emptyCycle;
 new cvar_runoffEnabled, cvar_runoffDuration;
 new cvar_voteStatus, cvar_voteStatusType;
 new cvar_soundsMute;
+new g_pNomBonusDivisor;
 
 public plugin_init()
 {
-	// build version information
-	new jnk[1], version[8], rev[8];
-	parse(PLUGIN_VERSION, version, charsmax(version), jnk, charsmax(jnk), rev, charsmax(rev), jnk, charsmax(jnk));
-	new pluginVersion[16];
-	formatex(pluginVersion, charsmax(pluginVersion), "%s.%s", version, rev);
-
-	register_plugin("Galileo", pluginVersion, "Brad Jones");
+	new const pluginVersion[] = "2.0.0"
+	register_plugin("Galileo", pluginVersion, "Brad Jones/Fysiks");
 	
 	register_cvar("gal_version", pluginVersion, FCVAR_SERVER|FCVAR_SPONLY);
 	set_cvar_string("gal_version", pluginVersion);
@@ -207,6 +206,8 @@ public plugin_init()
 	cvar_runoffDuration			= register_cvar("gal_runoff_duration", "10");
 	
 	cvar_soundsMute					= register_cvar("gal_sounds_mute", "0");
+	
+	g_pNomBonusDivisor = register_cvar("gal_nominationbonus", "0");
 	
 	//set_task(1.0, "dbg_test",_,_,_,"a", 15);
 }
@@ -1012,13 +1013,8 @@ nomination_attempt(id, nomination[]) // (playerName[], &phraseIdx, matchingSegme
 			// in most cases, the map will be available for selection, so assume that's the case here
 			disabledReason[0] = 0;
 
-			// disable if the map has already been nominated
-			if (nomination_getPlayer(mapIdx))
-			{
-				formatex(disabledReason, charsmax(disabledReason), "%L", id, "GAL_MATCH_NOMINATED");
-			}
 			// disable if the map is too recent
-			else if (map_isTooRecent(nominationMap))
+			if (map_isTooRecent(nominationMap))
 			{
 				formatex(disabledReason, charsmax(disabledReason), "%L", id, "GAL_MATCH_TOORECENT");
 			}
@@ -1075,35 +1071,78 @@ public nomination_handleMatchChoice(id, menu, item)
 	return PLUGIN_HANDLED;
 }
 
-nomination_getPlayer(idxMap)
+bool:isNominated(iMap)
 {
-	// check if the map has already been nominated
-	new idxNomination;
-	new playerNominationMax = min(get_pcvar_num(cvar_nomPlayerAllowance), MAX_NOMINATION_CNT);
-	
-	for (new idPlayer = 1; idPlayer <= MAX_PLAYER_CNT; ++idPlayer)
+	new bool:bFound = false
+	for( new i = 0; i < g_iNominatedMapsMaxIndex; i++ )
 	{
-		for (idxNomination = 1; idxNomination <= playerNominationMax; ++idxNomination)
+		if( g_NominatedMaps[i][MapID] == iMap && g_NominatedMaps[i][Tally] > 0 )
 		{
-			if (idxMap == g_nomination[idPlayer][idxNomination])
+			bFound = true
+			break
+		}
+	}
+	return bFound
+}
+
+getNominatedMapIndex(iMap)
+{
+	new index = -1
+	for( new i = 0; i < g_iNominatedMapsMaxIndex; i++ )
+	{
+		if( g_NominatedMaps[i][MapID] == iMap && g_NominatedMaps[i][Tally] > 0 )
+		{
+			index = i
+			break
+		}
+	}
+	return index
+}
+
+getPlayerNominationIndexByMap(id, iMap)
+{
+	new index = -1
+	for( new i = 0; i < sizeof(g_PlayerNominations[]); i++ )
+	{
+		if( g_PlayerNominations[id][i] >= 0 )
+		{
+			if( iMap == g_NominatedMaps[g_PlayerNominations[id][i]][MapID] )
 			{
-				return idPlayer;
+				index = i
+				break;
 			}
 		}
 	}
-	return 0;
+	return index
 }
+
+bool:isNominatedByPlayer(iMap, id)
+{
+	new bool:bFound = false
+	for( new i = 0; i < sizeof(g_PlayerNominations[]); i++ )
+	{
+		if( g_PlayerNominations[id][i] >= 0 )
+		{
+			if( iMap == g_NominatedMaps[g_PlayerNominations[id][i]][MapID] )
+			{
+				bFound = true;
+				break;
+			}
+		}
+	}
+	return bFound
+}
+
 
 nomination_toggle(id, idxMap)
 {
-	new idNominator = nomination_getPlayer(idxMap);
-	if (idNominator == id)
+	if( isNominatedByPlayer(idxMap, id) )
 	{
 		nomination_cancel(id, idxMap);
 	}
 	else
 	{
-		map_nominate(id, idxMap, idNominator);
+		map_nominate(id, idxMap);
 	}
 }
 
@@ -1121,47 +1160,35 @@ nomination_cancel(id, idxMap)
 		client_print(id, print_chat, "%L", id, "GAL_CANCEL_FAIL_VOTEOVER");
 		return;
 	}
-
-	new bool:nominationFound, idxNomination;
-	new playerNominationMax = min(get_pcvar_num(cvar_nomPlayerAllowance), MAX_NOMINATION_CNT);
 	
-	for (idxNomination = 1; idxNomination <= playerNominationMax; ++idxNomination)
-	{
-		if (g_nomination[id][idxNomination] == idxMap)
-		{
-			nominationFound = true;
-			break;
-		}
-	}
-
 	new mapName[32];
 	ArrayGetString(g_nominationMap, idxMap, mapName, charsmax(mapName));
-	
-	if (nominationFound)
+
+	if( isNominatedByPlayer(idxMap, id) )
 	{
-		g_nomination[id][idxNomination] = -1;
-		g_nominationCnt--;
+		// decrease prevote tally by one for map
+		new iNomIndex = getNominatedMapIndex(idxMap)
+		g_NominatedMaps[iNomIndex][Tally]--
 		
-		nomination_announceCancellation(mapName);
-	}
-	else
-	{
-		new idNominator = nomination_getPlayer(idxMap);
-		if (idNominator)
+		// remove it from player's nominations
+		g_PlayerNominations[id][getPlayerNominationIndexByMap(id, idxMap)] = -1;
+		
+		if( g_NominatedMaps[iNomIndex][Tally] <= 0 )
 		{
-			new name[32];
-			get_user_name(idNominator, name, 31);
-			
-			client_print(id, print_chat, "%L", id, "GAL_CANCEL_FAIL_SOMEONEELSE", mapName, name);
+			nomination_announceCancellation(mapName);
 		}
 		else
 		{
-			client_print(id, print_chat, "%L", id, "GAL_CANCEL_FAIL_WASNOTYOU", mapName);
+			// announce downvote?
 		}
+	}
+	else
+	{
+		client_print(id, print_chat, "You didn't nominate %s", mapName);
 	}
 }
 
-map_nominate(id, idxMap, idNominator = -1)
+map_nominate(id, idxMap)
 {
 	// nominations can only be made if a vote isn't already in progress
 	if (g_voteStatus & VOTE_IN_PROGRESS)
@@ -1194,94 +1221,98 @@ map_nominate(id, idxMap, idNominator = -1)
 		return;
 	}
 	
-	// check if the map has already been nominated
-	if (idNominator == -1)
+	// determine the number of nominations the player already made
+	// and grab an open slot with the presumption that the player can make the nomination
+	new nominationCnt = 0, iOpen, i;
+	new playerNominationMax = min(get_pcvar_num(cvar_nomPlayerAllowance), sizeof(g_PlayerNominations[]));
+	
+	for (i = 0; i < playerNominationMax; ++i)
 	{
-		idNominator = nomination_getPlayer(idxMap);
-	}
-
-	if (idNominator == 0)
-	{
-		// determine the number of nominations the player already made
-		// and grab an open slot with the presumption that the player can make the nomination
-		new nominationCnt = 0, idxNominationOpen, idxNomination;
-		new playerNominationMax = min(get_pcvar_num(cvar_nomPlayerAllowance), MAX_NOMINATION_CNT);
-		
-		for (idxNomination = 1; idxNomination <= playerNominationMax; ++idxNomination)
+		if (g_PlayerNominations[id][i] >= 0)
 		{
-			if (g_nomination[id][idxNomination] >= 0)
-			{
-				nominationCnt++;
-			}
-			else
-			{
-				idxNominationOpen = idxNomination;
-			}
-		}
-
-		if (nominationCnt == playerNominationMax)
-		{
-			new nominatedMaps[256], buffer[32];
-			for (idxNomination = 1; idxNomination <= playerNominationMax; ++idxNomination)
-			{
-				idxMap = g_nomination[id][idxNomination];
-				ArrayGetString(g_nominationMap, idxMap, buffer, charsmax(buffer));
-				format(nominatedMaps, charsmax(nominatedMaps), "%s%s%s", nominatedMaps, (idxNomination == 1) ? "" : ", ", buffer);
-			}
-				
-			client_print(id, print_chat, "%L", id, "GAL_NOM_FAIL_TOOMANY", playerNominationMax, nominatedMaps);
-			client_print(id, print_chat, "%L", id, "GAL_NOM_FAIL_TOOMANY_HLP");
+			nominationCnt++;
 		}
 		else
 		{
-			// otherwise, allow the nomination
-			g_nomination[id][idxNominationOpen] = idxMap;
-			g_nominationCnt++;
-			map_announceNomination(id, mapName);
-			client_print(id, print_chat, "%L", id, "GAL_NOM_GOOD_HLP");
-		}		
+			iOpen = i;
+		}
 	}
-	else if (idNominator == id)
+
+	if (nominationCnt == playerNominationMax)
 	{
-		client_print(id, print_chat, "%L", id, "GAL_NOM_FAIL_ALREADY", mapName);
+		// Player has reached max allowed nominations
+		new nominatedMaps[256], buffer[32];
+		for( i = 0; i < playerNominationMax; i++ )
+		{
+			new iNomIndex = g_PlayerNominations[id][i]
+			idxMap = g_NominatedMaps[iNomIndex][MapID];
+			ArrayGetString(g_nominationMap, idxMap, buffer, charsmax(buffer));
+			format(nominatedMaps, charsmax(nominatedMaps), "%s%s%s", nominatedMaps, (i == 0) ? "" : ", ", buffer);
+		}
+			
+		client_print(id, print_chat, "%L", id, "GAL_NOM_FAIL_TOOMANY", playerNominationMax, nominatedMaps);
+		client_print(id, print_chat, "%L", id, "GAL_NOM_FAIL_TOOMANY_HLP");
 	}
 	else
 	{
-		new name[32];
-		get_user_name(idNominator, name, 31);
+		// allow the nomination
 		
-		client_print(id, print_chat, "%L", id, "GAL_NOM_FAIL_SOMEONEELSE", mapName, name);
-		client_print(id, print_chat, "%L", id, "GAL_NOM_FAIL_SOMEONEELSE_HLP");
-	}	
+		new iNominatedIndex = getNominatedMapIndex(idxMap)
+		if( iNominatedIndex < 0 )
+		{
+			// Map hasn't been nominated yet so add to list of nominated maps
+			
+			// Find the first unused slot in the nominated maps list
+			for( i = 0; i < sizeof(g_NominatedMaps); i++ )
+			{
+				if( g_NominatedMaps[i][MapID] < 0 )
+				{
+					break;
+				}
+			}
+			
+			// Add the new map and update the index
+			g_NominatedMaps[i][MapID] = idxMap
+			g_NominatedMaps[i][Tally] = 0
+			iNominatedIndex = i
+		}
+		
+		g_NominatedMaps[iNominatedIndex][Tally]++
+		
+		g_PlayerNominations[id][iOpen] = iNominatedIndex;
+		g_iNominatedMapsMaxIndex++;
+		
+		// Announcement
+		if( g_NominatedMaps[iNominatedIndex][Tally] == 1 ) // Just nominated
+		{
+			map_announceNomination(id, mapName);
+		}
+		else
+		{
+			new szName[32]; get_user_name(id, szName, charsmax(szName));
+			client_print(0, print_chat, "%s upvoted ^"%s^"", szName, mapName)
+		}
+		client_print(id, print_chat, "%L", id, "GAL_NOM_GOOD_HLP");
+	}		
 }
 
 public nomination_list(id)
 {
-	new idxNomination, idxMap; //, hudMessage[512];
-	new msg[101], mapCnt;
-	new playerNominationMax = min(get_pcvar_num(cvar_nomPlayerAllowance), MAX_NOMINATION_CNT);
+	new msg[128], mapCnt;
 	new mapName[32];
 	
-	for (new idPlayer = 1; idPlayer <= MAX_PLAYER_CNT; ++idPlayer)
+	for( new i = 0; i < g_iNominatedMapsMaxIndex; i++ )
 	{
-		for (idxNomination = 1; idxNomination <= playerNominationMax; ++idxNomination)
+		if( IsValidNomination(i) ) // filter out maps that lost all its pre-votes
 		{
-			idxMap = g_nomination[idPlayer][idxNomination];
-			if (idxMap >= 0)
+			ArrayGetString(g_nominationMap, g_NominatedMaps[i][MapID], mapName, charsmax(mapName));
+			format(msg, charsmax(msg), "%s, %s(%d)", msg, mapName, g_NominatedMaps[i][Tally]);
+			
+			if (++mapCnt == 4)	// list 4 maps per chat line
 			{
-				ArrayGetString(g_nominationMap, idxMap, mapName, charsmax(mapName));
-				format(msg, charsmax(msg), "%s, %s", msg, mapName);
-				
-				if (++mapCnt == 4)	// list 4 maps per chat line
-				{
-					client_print(0, print_chat, "%L: %s", LANG_PLAYER, "GAL_NOMINATIONS", msg[2]);
-					mapCnt = 0;
-					msg[0] = 0;
-				}
-				// construct the HUD message
-//				format(hudMessage, charsmax(hudMessage), "%s^n%s", hudMessage, mapName);
-				
-				// construct the console message
+				client_print(0, print_chat, "%L: %s", LANG_PLAYER, "GAL_NOMINATIONS", msg[2]);
+				mapCnt = 0;
+				msg[0] = 0;
 			}
 		}
 	}
@@ -1293,9 +1324,6 @@ public nomination_list(id)
 	{
 		client_print(0, print_chat, "%L: %L", LANG_PLAYER, "GAL_NOMINATIONS", LANG_PLAYER, "NONE");
 	}
-
-//	set_hudmessage(255, 0, 90, 0.80, 0.20, 0, 1.0, 12.0, 0.1, 0.1, -1);
-//	ShowSyncHudMsg(id, g_nonOverlapHudSync, hudMessage);
 }
 
 public vote_startDirector(bool:forced)
@@ -1356,6 +1384,24 @@ public vote_startDirector(bool:forced)
 	{
 		// alphabetize the maps
 		SortCustom2D(g_mapChoice, choicesLoaded, "sort_stringsi");
+
+		// Add bonus votes from nominations if enabled
+		new iBonusDivisor = get_pcvar_num(g_pNomBonusDivisor)
+		if( iBonusDivisor && !(g_voteStatus & VOTE_IS_RUNOFF) )
+		{
+			// loop through maps in vote and add their nomination tally to the vote tally
+			// Requires that the g_mapChoice array was fully zeroed out before maps are put into it
+			new iLen
+			for(new i = 0; i < g_choiceCnt; i++)
+			{
+				iLen = strlen(g_mapChoice[i])
+				
+				if( iLen < charsmax(g_mapChoice[]) )
+				{
+					g_mapVote[i] += g_mapChoice[i][iLen+1] / iBonusDivisor
+				}
+			}
+		}
 
 		// dbg code ----
 		if (get_realplayersnum())
@@ -1438,72 +1484,52 @@ public vote_countdownPendingVote()
 
 vote_addNominations()
 {
-	// dbg code ----
-	if (get_realplayersnum())
-	{
-		dbg_log(4, "   [NOMINATIONS (%i)]", g_nominationCnt);
-	}
-	//--------------
+	// set how many total nominations we can use in this vote
+	new maxNominations = get_pcvar_num(cvar_nomQtyUsed);
+	new slotsAvailable = g_choiceMax - g_choiceCnt;
+	new voteNominationMax = (maxNominations) ? min(maxNominations, slotsAvailable) : slotsAvailable;
 	
-	if (g_nominationCnt)
+	// add the top 'voteNominationMax' nominations to the list
+	new mapName[32], iLen;
+	
+	
+	// TODO:  get the top 5 nominated maps here.
+	new sortedNominations[sizeof(g_NominatedMaps)][MapTally], j = 0
+	for( new i = 0; i < g_iNominatedMapsMaxIndex; i++ )
 	{
-		// set how many total nominations we can use in this vote
-		new maxNominations = get_pcvar_num(cvar_nomQtyUsed);
-		new slotsAvailable = g_choiceMax - g_choiceCnt;
-		new voteNominationMax = (maxNominations) ? min(maxNominations, slotsAvailable) : slotsAvailable;
-		
-		// set how many total nominations each player is allowed
-		new playerNominationMax = min(get_pcvar_num(cvar_nomPlayerAllowance), MAX_NOMINATION_CNT);
-
-		// add as many nominations as we can	
-		// [TODO: develop a better method of determining which nominations make the cut; either FIFO or random]
-		new idxMap, id, mapName[32];
-
-		// dbg code ----
-		if (get_realplayersnum())
+		if( IsValidNomination(i) )
 		{
-			new nominator_id, playerName[32];
-			for (new idxNomination = playerNominationMax; idxNomination >= 1; --idxNomination)
-			{
-				for (id = 1; id <= MAX_PLAYER_CNT; ++id)
-				{
-					idxMap = g_nomination[id][idxNomination];
-					if (idxMap >= 0)
-					{
-						ArrayGetString(g_nominationMap, idxMap, mapName, charsmax(mapName));
-						nominator_id = nomination_getPlayer(idxMap);
-						get_user_name(nominator_id, playerName, charsmax(playerName));
-	
-						dbg_log(4, "      %-32s %s", mapName, playerName);
-					}
-				}
-			}
-			dbg_log(4, "");
+			sortedNominations[j][MapID] = g_NominatedMaps[i][MapID]
+			sortedNominations[j][Tally] = g_NominatedMaps[i][Tally]
+			j++
 		}
-		//--------------
-
-		for (new idxNomination = playerNominationMax; idxNomination >= 1; --idxNomination)
-		{
-			for (id = 1; id <= MAX_PLAYER_CNT; ++id)
-			{
-				idxMap = g_nomination[id][idxNomination];
-				if (idxMap >= 0)
-				{
-					ArrayGetString(g_nominationMap, idxMap, mapName, charsmax(mapName));
-					copy(g_mapChoice[g_choiceCnt++], sizeof(g_mapChoice[])-1, mapName);
-					
-					if (g_choiceCnt == voteNominationMax)
-					{
-						break;
-					}
-				}
-			}
-			if (g_choiceCnt == voteNominationMax)
-			{
-				break;
-			}
-		}	
 	}
+	
+	SortCustom2D(sortedNominations, j, "MapTallySortFunc")
+	
+	for( new i = 0; i < j; i++ )
+	{
+		ArrayGetString(g_nominationMap, sortedNominations[i][MapID], mapName, charsmax(mapName));
+		copy(g_mapChoice[g_choiceCnt], charsmax(g_mapChoice[]), mapName);
+		
+		iLen = strlen(g_mapChoice[g_choiceCnt])
+		if( iLen < charsmax(g_mapChoice[]) )
+		{
+			g_mapChoice[g_choiceCnt][iLen+1] = sortedNominations[i][Tally]
+		}
+		
+		g_choiceCnt++
+		
+		if( g_choiceCnt == voteNominationMax )
+		{
+			break;
+		}
+	}	
+}
+
+public MapTallySortFunc(const elem1[], const elem2[])
+{
+	return (elem1[_:Tally] > elem2[_:Tally] ? -1 : (elem1[_:Tally] == elem2[_:Tally] ? 0 : 1))
 }
 
 vote_addFiller()
@@ -1641,6 +1667,13 @@ vote_addFiller()
 
 vote_loadChoices()
 {
+	// Zero out the g_mapChoice array so that bonus points (embedded after EOS) aren't screwed up by old values
+	for( new i = 0; i < sizeof(g_mapChoice); i++ )
+	{
+		arrayset(g_mapChoice[i], 0, sizeof(g_mapChoice[]))
+	}
+	g_choiceCnt = 0
+	
 	vote_addNominations();
 	vote_addFiller();
 	
@@ -2532,7 +2565,7 @@ public cmd_HL1_listmaps(id)
 
 map_listAll(id)
 {
-	static lastMapDisplayed[MAX_PLAYER_CNT + 1][2];
+	static lastMapDisplayed[PLAYER_DIMENSION_SIZE][2];
 
 	// determine if the player has requested a listing before
 	new userid = get_user_userid(id);
@@ -2603,21 +2636,12 @@ map_listAll(id)
 
 	con_print(id, "^n----- %L -----", id, "GAL_LISTMAPS_TITLE", g_nominationMapCnt);
 
-	new nominated[64], nominator_id, name[32], mapName[32], idx;
+	new bool:wasNominated, mapName[32], idx;
 	for (idx = start - 1; idx < end; idx++)
 	{
-		nominator_id = nomination_getPlayer(idx);
-		if (nominator_id)
-		{
-			get_user_name(nominator_id, name, charsmax(name));
-			formatex(nominated, charsmax(nominated), "%L", id, "GAL_NOMINATEDBY", name);
-		}
-		else
-		{ 
-			nominated[0] = 0;
-		}
+		wasNominated = isNominated(idx);
 		ArrayGetString(g_nominationMap, idx, mapName, charsmax(mapName));
-		con_print(id, "%3i: %s  %s", idx + 1, mapName, nominated);
+		con_print(id, "%3i: %s  %s", idx + 1, mapName, wasNominated ? "Nominated" : "");
 	}
 
 	if (mapCount && mapCount < g_nominationMapCnt)
@@ -2630,39 +2654,6 @@ map_listAll(id)
 		}
 	}
 }
-
-/*
-map_listMatches(id, match[])
-{
-	strtolower(match);
-	con_print(id, "%L", id, "GAL_MATCHING", match);
-	con_print(id, "------------------------------------------");
-	
-	new mapName[32], matchCnt;
-	new nominated[64], nominator_id, name[32];
-
-	for (new idx = 1; idx <= g_nominationMapCnt; ++idx)
-	{
-		copy(mapName, charsmax(mapName), g_nominationMap[idx]);
-		strtolower(mapName);
-		
-		if (containi(mapName, match) > -1)
-		{
-			nominator_id = nomination_getPlayer(idx);
-			if (nominator_id)
-			{
-				get_user_name(nominator_id, name, charsmax(name));
-				formatex(nominated, charsmax(nominated), "(nominated by %s)", name);
-			}
-			else
-			{
-				nominated[0] = 0;
-			}			
-			con_print(id, "%3i: %s  %s", ++matchCnt, g_nominationMap[idx], nominated);
-		}
-	}
-}
-*/
 
 con_print(id, message[], {Float,Sql,Result,_}:...)
 {
@@ -2692,17 +2683,22 @@ public client_disconnect(id)
 	vote_unrock(id);
 
 	// cancel player's nominations
-	new playerNominationMax = min(get_pcvar_num(cvar_nomPlayerAllowance), MAX_NOMINATION_CNT);
+	new playerNominationMax = min(get_pcvar_num(cvar_nomPlayerAllowance), sizeof(g_PlayerNominations[]));
 	new nominatedMaps[256], nominationCnt, idxMap, mapName[32];
-	for (new idxNomination = 1; idxNomination <= playerNominationMax; ++idxNomination)
+	for (new idxNomination = 0; idxNomination < playerNominationMax; ++idxNomination)
 	{
-		idxMap = g_nomination[id][idxNomination];
+		idxMap = g_PlayerNominations[id][idxNomination];
 		if (idxMap >= 0)
 		{
-			ArrayGetString(g_nominationMap, idxMap, mapName, charsmax(mapName));
-			nominationCnt++;
-			format(nominatedMaps, charsmax(nominatedMaps), "%s%s, ", nominatedMaps, mapName);
-			g_nomination[id][idxNomination] = -1;
+			g_NominatedMaps[idxMap][Tally]--
+			g_PlayerNominations[id][idxNomination] = -1;
+			
+			if( g_NominatedMaps[idxMap][Tally] <= 0 )
+			{
+				ArrayGetString(g_nominationMap, idxMap, mapName, charsmax(mapName));
+				nominationCnt++;
+				format(nominatedMaps, charsmax(nominatedMaps), "%s%s, ", nominatedMaps, mapName);
+			}
 		}
 	}
 	if (nominationCnt)
@@ -2817,14 +2813,19 @@ nomination_announceCancellation(nominations[])
 
 nomination_clearAll()
 {
-	for (new idxPlayer = 1; idxPlayer <= MAX_PLAYER_CNT; idxPlayer++)
+	for (new idxPlayer = 0; idxPlayer < sizeof(g_PlayerNominations); idxPlayer++)
 	{
-		for (new idxNomination = 1; idxNomination <= MAX_NOMINATION_CNT; idxNomination++)
+		for (new idxNomination = 0; idxNomination < sizeof(g_PlayerNominations[]); idxNomination++)
 		{
-			g_nomination[idxPlayer][idxNomination] = -1;
+			g_PlayerNominations[idxPlayer][idxNomination] = -1;
 		}
 	}
-	g_nominationCnt = 0;
+	for( new i = 0; i < sizeof(g_NominatedMaps); i++ )
+	{
+		g_NominatedMaps[i][MapID] = -1
+		g_NominatedMaps[i][Tally] = 0
+	}
+	g_iNominatedMapsMaxIndex = 0;
 }
 
 map_announceNomination(id, map[])
