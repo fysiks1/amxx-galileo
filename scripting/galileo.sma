@@ -119,9 +119,9 @@ public plugin_init()
 {
 	// build version information
 	new jnk[1], version[8], rev[8];
-	parse(PLUGIN_VERSION, version, sizeof(version)-1, jnk, sizeof(jnk)-1, rev, sizeof(rev)-1, jnk, sizeof(jnk)-1);
+	parse(PLUGIN_VERSION, version, charsmax(version), jnk, charsmax(jnk), rev, charsmax(rev), jnk, charsmax(jnk));
 	new pluginVersion[16];
-	formatex(pluginVersion, sizeof(pluginVersion)-1, "%s.%s", version, rev);
+	formatex(pluginVersion, charsmax(pluginVersion), "%s.%s", version, rev);
 
 	register_plugin("Galileo", pluginVersion, "Brad Jones");
 	
@@ -235,8 +235,8 @@ public dbg_fakeVotes()
 
 public plugin_cfg()
 {
-	formatex(DIR_CONFIGS[get_configsdir(DIR_CONFIGS, sizeof(DIR_CONFIGS)-1)], sizeof(DIR_CONFIGS)-1, "/galileo");
-	formatex(DIR_DATA[get_datadir(DIR_DATA, sizeof(DIR_DATA)-1)], sizeof(DIR_DATA)-1, "/galileo");
+	formatex(DIR_CONFIGS[get_configsdir(DIR_CONFIGS, charsmax(DIR_CONFIGS))], charsmax(DIR_CONFIGS), "/galileo");
+	formatex(DIR_DATA[get_datadir(DIR_DATA, charsmax(DIR_DATA))], charsmax(DIR_DATA), "/galileo");
 
 	server_cmd("exec %s/galileo.cfg", DIR_CONFIGS);
 	server_exec();
@@ -249,8 +249,8 @@ public plugin_cfg()
 	}
 
 	g_rtvWait = get_pcvar_float(cvar_rtvWait);
-	get_pcvar_string(cvar_voteWeightFlags, g_voteWeightFlags, sizeof(g_voteWeightFlags)-1);
-	get_mapname(g_currentMap, sizeof(g_currentMap)-1);
+	get_pcvar_string(cvar_voteWeightFlags, g_voteWeightFlags, charsmax(g_voteWeightFlags));
+	get_mapname(g_currentMap, charsmax(g_currentMap));
 	g_choiceMax = max(min(MAX_MAPS_IN_VOTE, get_pcvar_num(cvar_voteMapChoiceCnt)), 2);
 //	g_nonOverlapHudSync = CreateHudSyncObj();
 	g_fillerMap = ArrayCreate(32);
@@ -322,7 +322,7 @@ public vote_setupEnd()
 	new nextMap[32];
 	if (get_pcvar_num(cvar_endOfMapVote))
 	{
-		formatex(nextMap, sizeof(nextMap)-1, "%L", LANG_SERVER, "GAL_NEXTMAP_UNKNOWN");
+		formatex(nextMap, charsmax(nextMap), "%L", LANG_SERVER, "GAL_NEXTMAP_UNKNOWN");
 	}
 	else
 	{
@@ -346,7 +346,7 @@ map_getNext(Array:mapArray, currentMap[], nextMap[32])
 	new thisMap[32], mapCnt = ArraySize(mapArray), nextmapIdx = 0, returnVal = -1;
 	for (new mapIdx = 0; mapIdx < mapCnt; mapIdx++)
 	{
-		ArrayGetString(mapArray, mapIdx, thisMap, sizeof(thisMap)-1);
+		ArrayGetString(mapArray, mapIdx, thisMap, charsmax(thisMap));
 		if (equal(currentMap, thisMap))
 		{
 			nextmapIdx = (mapIdx == mapCnt - 1) ? 0 : mapIdx + 1;
@@ -354,7 +354,7 @@ map_getNext(Array:mapArray, currentMap[], nextMap[32])
 			break;
 		}
 	}
-	ArrayGetString(mapArray, nextmapIdx, nextMap, sizeof(nextMap)-1);
+	ArrayGetString(mapArray, nextmapIdx, nextMap, charsmax(nextMap));
 	
 	return returnVal;
 }
@@ -373,17 +373,17 @@ public srv_handleStart()
 		if (startAction == SRV_START_CURRENTMAP || startAction == SRV_START_NEXTMAP)
 		{
 			new filename[256];
-			formatex(filename, sizeof(filename)-1, "%s/info.dat", DIR_DATA);
+			formatex(filename, charsmax(filename), "%s/info.dat", DIR_DATA);
 		
 			new file = fopen(filename, "rt"); 
 			if (file) // !feof(file)
 			{ 
-				fgets(file, nextMap, sizeof(nextMap)-1);
+				fgets(file, nextMap, charsmax(nextMap));
 
 				if (startAction == SRV_START_NEXTMAP)
 				{
 					nextMap[0] = 0;
-					fgets(file, nextMap, sizeof(nextMap)-1);
+					fgets(file, nextMap, charsmax(nextMap));
 				}
 			}
 			fclose(file);
@@ -400,7 +400,7 @@ public srv_handleStart()
 			
 			if (g_nominationMapCnt)
 			{
-				ArrayGetString(g_nominationMap, random_num(0, g_nominationMapCnt - 1), nextMap, sizeof(nextMap)-1);
+				ArrayGetString(g_nominationMap, random_num(0, g_nominationMapCnt - 1), nextMap, charsmax(nextMap));
 			}
 		}
 		
@@ -431,7 +431,7 @@ map_setNext(nextMap[])
 	
 	// update our data file
 	new filename[256];
-	formatex(filename, sizeof(filename)-1, "%s/info.dat", DIR_DATA);
+	formatex(filename, charsmax(filename), "%s/info.dat", DIR_DATA);
 
 	new file = fopen(filename, "wt");
 	if (file)
@@ -466,7 +466,7 @@ public vote_manageEnd()
 public map_loadRecentList()
 {
 	new filename[256];
-	formatex(filename, sizeof(filename)-1, "%s/recentmaps.dat", DIR_DATA);
+	formatex(filename, charsmax(filename), "%s/recentmaps.dat", DIR_DATA);
 
 	new file = fopen(filename, "rt");
 	if (file)
@@ -475,7 +475,7 @@ public map_loadRecentList()
 		
 		while (!feof(file))
 		{
-			fgets(file, buffer, sizeof(buffer)-1);
+			fgets(file, buffer, charsmax(buffer));
 			trim(buffer);
 
 			if (buffer[0])
@@ -484,7 +484,7 @@ public map_loadRecentList()
 				{
 					break;
 				}
-				copy(g_recentMap[g_cntRecentMap++], sizeof(buffer)-1, buffer);
+				copy(g_recentMap[g_cntRecentMap++], charsmax(buffer), buffer);
 			}
 		}
 		fclose(file);
@@ -494,7 +494,7 @@ public map_loadRecentList()
 public map_writeRecentList()
 {
 	new filename[256];
-	formatex(filename, sizeof(filename)-1, "%s/recentmaps.dat", DIR_DATA);
+	formatex(filename, charsmax(filename), "%s/recentmaps.dat", DIR_DATA);
 
 	new file = fopen(filename, "wt");
 	if (file)
@@ -532,7 +532,7 @@ public cmd_nominations(id)
 public cmd_nextmap(id)
 {
 	new map[32];
-	get_cvar_string("amx_nextmap", map, sizeof(map)-1);
+	get_cvar_string("amx_nextmap", map, charsmax(map));
 	client_print(0, print_chat, "%L %s", LANG_PLAYER, "NEXT_MAP", map);
 	return PLUGIN_CONTINUE;
 }
@@ -552,7 +552,7 @@ public cmd_listrecent(id)
 			new msg[101], msgIdx;
 			for (new idx = 0; idx < g_cntRecentMap; ++idx)
 			{
-				msgIdx += format(msg[msgIdx], sizeof(msg)-1-msgIdx, ", %s", g_recentMap[idx]);
+				msgIdx += format(msg[msgIdx], charsmax(msg)-msgIdx, ", %s", g_recentMap[idx]);
 			}	
 			client_print(0, print_chat, "%L: %s", LANG_PLAYER, "GAL_MAP_RECENTMAPS", msg[2]);	
 		}
@@ -587,7 +587,7 @@ public cmd_startVote(id, level, cid)
 		if (read_argc() == 2)
 		{
 			new arg[32];
-			read_args(arg, sizeof(arg)-1);
+			read_args(arg, charsmax(arg));
 			
 			if (equali(arg, "-nochange"))
 			{
@@ -618,7 +618,7 @@ map_populateList(Array:mapArray, mapFilename[])
 			
 			while (!feof(file))
 			{
-				fgets(file, buffer, sizeof(buffer)-1);
+				fgets(file, buffer, charsmax(buffer));
 				trim(buffer);
 				
 				if (buffer[0] && !equal(buffer, "//", 2) && !equal(buffer, ";", 1) && is_map_valid(buffer))
@@ -638,13 +638,13 @@ map_populateList(Array:mapArray, mapFilename[])
 	{
 		// no file provided, assuming contents of "maps" folder
 		new dir, mapName[32];
-		dir = open_dir("maps", mapName, sizeof(mapName)-1);
+		dir = open_dir("maps", mapName, charsmax(mapName));
 
 		if (dir)
 		{
 			new lenMapName;
 			
-			while (next_file(dir, mapName, sizeof(mapName)-1))
+			while (next_file(dir, mapName, charsmax(mapName)))
 			{
 				lenMapName = strlen(mapName);	
 				if (lenMapName > 4 && equali(mapName[lenMapName - 4], ".bsp", 4))
@@ -671,7 +671,7 @@ map_populateList(Array:mapArray, mapFilename[])
 public map_loadNominationList()
 {
 	new filename[256];
-	get_pcvar_string(cvar_nomMapFile, filename, sizeof(filename)-1);
+	get_pcvar_string(cvar_nomMapFile, filename, charsmax(filename));
 
 	g_nominationMapCnt = map_populateList(g_nominationMap, filename);
 }
@@ -695,23 +695,23 @@ public cmd_createMapFile(id, level, cid)
 		case 1:
 		{
 			new arg1[256];
-			read_argv(1, arg1, sizeof(arg1)-1);
+			read_argv(1, arg1, charsmax(arg1));
 			remove_quotes(arg1);
 
 			new mapName[MAX_MAPNAME_LEN+5];	// map name is 31 (i.e. MAX_MAPNAME_LEN), ".bsp" is 4, string terminator is 1.
 			new dir, file, mapCnt, lenMapName;
 			
-			dir = open_dir("maps", mapName, sizeof(mapName)-1);
+			dir = open_dir("maps", mapName, charsmax(mapName));
 			if (dir)
 			{
 				new filename[256];
-				formatex(filename, sizeof(filename)-1, "%s/%s", DIR_CONFIGS, arg1);
+				formatex(filename, charsmax(filename), "%s/%s", DIR_CONFIGS, arg1);
 				
 				file = fopen(filename, "wt");
 				if (file)
 				{
 					mapCnt = 0;
-					while (next_file(dir, mapName, sizeof(mapName)-1))
+					while (next_file(dir, mapName, charsmax(mapName)))
 					{
 						lenMapName = strlen(mapName);	
 						
@@ -753,7 +753,7 @@ public cmd_createMapFile(id, level, cid)
 public map_loadPrefixList()
 {
 	new filename[256];
-	formatex(filename, sizeof(filename)-1, "%s/prefixes.ini", DIR_CONFIGS);
+	formatex(filename, charsmax(filename), "%s/prefixes.ini", DIR_CONFIGS);
 
 	new file = fopen(filename, "rt");
 	if (file)
@@ -761,13 +761,13 @@ public map_loadPrefixList()
 		new buffer[16];
 		while (!feof(file))
 		{
-			fgets(file, buffer, sizeof(buffer)-1);
+			fgets(file, buffer, charsmax(buffer));
 			if (buffer[0] && !equal(buffer, "//", 2))
 			{
 				if (g_mapPrefixCnt <= MAX_PREFIX_CNT)
 				{
 					trim(buffer);
-					copy(g_mapPrefix[g_mapPrefixCnt++], sizeof(buffer)-1, buffer);
+					copy(g_mapPrefix[g_mapPrefixCnt++], charsmax(buffer), buffer);
 				}
 				else
 				{
@@ -788,7 +788,7 @@ public map_loadPrefixList()
 map_loadEmptyCycleList()
 {
 	new filename[256];
-	get_pcvar_string(cvar_emptyMapFile, filename, sizeof(filename)-1);
+	get_pcvar_string(cvar_emptyMapFile, filename, charsmax(filename));
 
 	g_emptyMapCnt = map_populateList(g_emptyCycleMap, filename);	
 }
@@ -840,7 +840,7 @@ public map_manageEnd()
 		}
 
 		new map[MAX_MAPNAME_LEN + 1];
-		get_cvar_string("amx_nextmap", map, sizeof(map)-1);
+		get_cvar_string("amx_nextmap", map, charsmax(map));
 		client_print(0, print_chat, "%L", LANG_PLAYER, "GAL_NEXTMAP", map);
 	}
 	
@@ -903,11 +903,11 @@ map_getIdx(text[])
 	
 	for (new prefixIdx = 0; prefixIdx < g_mapPrefixCnt; ++prefixIdx)
 	{
-		formatex(map, sizeof(map)-1, "%s%s", g_mapPrefix[prefixIdx], text);
+		formatex(map, charsmax(map), "%s%s", g_mapPrefix[prefixIdx], text);
 
 		for (mapIdx = 0; mapIdx < g_nominationMapCnt; ++mapIdx)
 		{
-			ArrayGetString(g_nominationMap, mapIdx, nominationMap, sizeof(nominationMap)-1);
+			ArrayGetString(g_nominationMap, mapIdx, nominationMap, charsmax(nominationMap));
 			
 			if (equal(map, nominationMap))
 			{
@@ -925,12 +925,12 @@ public cmd_say(id)
 	//-----
 	
 	static text[70], arg1[32], arg2[32], arg3[2];
-	read_args(text, sizeof(text)-1);
+	read_args(text, charsmax(text));
 	remove_quotes(text);
 	arg1[0] = '^0';
 	arg2[0] = '^0';
 	arg3[0] = '^0';
-	parse(text, arg1, sizeof(arg1)-1, arg2, sizeof(arg2)-1, arg3, sizeof(arg3)-1);
+	parse(text, arg1, charsmax(arg1), arg2, charsmax(arg2), arg3, charsmax(arg3));
 
 	// if the chat line has more than 2 words, we're not interested at all
 	if (arg3[0] == 0)
@@ -998,7 +998,7 @@ nomination_attempt(id, nomination[]) // (playerName[], &phraseIdx, matchingSegme
 	new mapIdx, nominationMap[32], matchCnt = 0, matchIdx = -1, info[1], choice[64], disabledReason[16];
 	for (mapIdx = 0; mapIdx < g_nominationMapCnt && matchCnt <= MAX_NOM_MATCH_CNT; ++mapIdx)
 	{
-		ArrayGetString(g_nominationMap, mapIdx, nominationMap, sizeof(nominationMap)-1);
+		ArrayGetString(g_nominationMap, mapIdx, nominationMap, charsmax(nominationMap));
 		
 		if (contain(nominationMap, nomination) > -1)
 		{
@@ -1015,19 +1015,19 @@ nomination_attempt(id, nomination[]) // (playerName[], &phraseIdx, matchingSegme
 			// disable if the map has already been nominated
 			if (nomination_getPlayer(mapIdx))
 			{
-				formatex(disabledReason, sizeof(disabledReason)-1, "%L", id, "GAL_MATCH_NOMINATED");
+				formatex(disabledReason, charsmax(disabledReason), "%L", id, "GAL_MATCH_NOMINATED");
 			}
 			// disable if the map is too recent
 			else if (map_isTooRecent(nominationMap))
 			{
-				formatex(disabledReason, sizeof(disabledReason)-1, "%L", id, "GAL_MATCH_TOORECENT");
+				formatex(disabledReason, charsmax(disabledReason), "%L", id, "GAL_MATCH_TOORECENT");
 			}
 			else if (equal(g_currentMap, nominationMap))
 			{
-				formatex(disabledReason, sizeof(disabledReason)-1, "%L", id, "GAL_MATCH_CURRENTMAP");
+				formatex(disabledReason, charsmax(disabledReason), "%L", id, "GAL_MATCH_CURRENTMAP");
 			}
 
-			formatex(choice, sizeof(choice)-1, "%s %s", nominationMap, disabledReason);
+			formatex(choice, charsmax(choice), "%s %s", nominationMap, disabledReason);
 			menu_additem(g_nominationMatchesMenu[id], choice, info, (disabledReason[0] == 0) ? 0 : (1<<26));
 		}
 	}
@@ -1135,7 +1135,7 @@ nomination_cancel(id, idxMap)
 	}
 
 	new mapName[32];
-	ArrayGetString(g_nominationMap, idxMap, mapName, sizeof(mapName)-1);
+	ArrayGetString(g_nominationMap, idxMap, mapName, charsmax(mapName));
 	
 	if (nominationFound)
 	{
@@ -1177,7 +1177,7 @@ map_nominate(id, idxMap, idNominator = -1)
 	}
 	
 	new mapName[32];
-	ArrayGetString(g_nominationMap, idxMap, mapName, sizeof(mapName)-1);
+	ArrayGetString(g_nominationMap, idxMap, mapName, charsmax(mapName));
 	
 	// players can not nominate the current map
 	if (equal(g_currentMap, mapName))
@@ -1225,8 +1225,8 @@ map_nominate(id, idxMap, idNominator = -1)
 			for (idxNomination = 1; idxNomination <= playerNominationMax; ++idxNomination)
 			{
 				idxMap = g_nomination[id][idxNomination];
-				ArrayGetString(g_nominationMap, idxMap, buffer, sizeof(buffer)-1);
-				format(nominatedMaps, sizeof(nominatedMaps)-1, "%s%s%s", nominatedMaps, (idxNomination == 1) ? "" : ", ", buffer);
+				ArrayGetString(g_nominationMap, idxMap, buffer, charsmax(buffer));
+				format(nominatedMaps, charsmax(nominatedMaps), "%s%s%s", nominatedMaps, (idxNomination == 1) ? "" : ", ", buffer);
 			}
 				
 			client_print(id, print_chat, "%L", id, "GAL_NOM_FAIL_TOOMANY", playerNominationMax, nominatedMaps);
@@ -1269,8 +1269,8 @@ public nomination_list(id)
 			idxMap = g_nomination[idPlayer][idxNomination];
 			if (idxMap >= 0)
 			{
-				ArrayGetString(g_nominationMap, idxMap, mapName, sizeof(mapName)-1);
-				format(msg, sizeof(msg)-1, "%s, %s", msg, mapName);
+				ArrayGetString(g_nominationMap, idxMap, mapName, charsmax(mapName));
+				format(msg, charsmax(msg), "%s, %s", msg, mapName);
 				
 				if (++mapCnt == 4)	// list 4 maps per chat line
 				{
@@ -1279,7 +1279,7 @@ public nomination_list(id)
 					msg[0] = 0;
 				}
 				// construct the HUD message
-//				format(hudMessage, sizeof(hudMessage)-1, "%s^n%s", hudMessage, mapName);
+//				format(hudMessage, charsmax(hudMessage), "%s^n%s", hudMessage, mapName);
 				
 				// construct the console message
 			}
@@ -1324,7 +1324,7 @@ public vote_startDirector(bool:forced)
 		if (forced || get_pcvar_num(cvar_endOfMapVote))
 		{
 			new nextMap[32];
-			formatex(nextMap, sizeof(nextMap)-1, "%L", LANG_SERVER, "GAL_NEXTMAP_VOTING");
+			formatex(nextMap, charsmax(nextMap), "%L", LANG_SERVER, "GAL_NEXTMAP_VOTING");
 			map_setNext(nextMap);
 		}
 	
@@ -1470,9 +1470,9 @@ vote_addNominations()
 					idxMap = g_nomination[id][idxNomination];
 					if (idxMap >= 0)
 					{
-						ArrayGetString(g_nominationMap, idxMap, mapName, sizeof(mapName)-1);
+						ArrayGetString(g_nominationMap, idxMap, mapName, charsmax(mapName));
 						nominator_id = nomination_getPlayer(idxMap);
-						get_user_name(nominator_id, playerName, sizeof(playerName)-1);
+						get_user_name(nominator_id, playerName, charsmax(playerName));
 	
 						dbg_log(4, "      %-32s %s", mapName, playerName);
 					}
@@ -1489,7 +1489,7 @@ vote_addNominations()
 				idxMap = g_nomination[id][idxNomination];
 				if (idxMap >= 0)
 				{
-					ArrayGetString(g_nominationMap, idxMap, mapName, sizeof(mapName)-1);
+					ArrayGetString(g_nominationMap, idxMap, mapName, charsmax(mapName));
 					copy(g_mapChoice[g_choiceCnt++], sizeof(g_mapChoice[])-1, mapName);
 					
 					if (g_choiceCnt == voteNominationMax)
@@ -1515,7 +1515,7 @@ vote_addFiller()
 
 	// grab the name of the filler file
 	new filename[256];
-	get_pcvar_string(cvar_voteMapFile, filename, sizeof(filename)-1);
+	get_pcvar_string(cvar_voteMapFile, filename, charsmax(filename));
 
 	// create an array of files that will be pulled from
 	new fillerFile[8][256];
@@ -1528,7 +1528,7 @@ vote_addFiller()
 		if (file)
 		{
 			new buffer[16];
-			fgets(file, buffer, sizeof(buffer)-1);
+			fgets(file, buffer, charsmax(buffer));
 			trim(buffer);
 			fclose(file);
 
@@ -1543,7 +1543,7 @@ vote_addFiller()
 				
 				while (!feof(file))
 				{
-					fgets(file, buffer, sizeof(buffer)-1);
+					fgets(file, buffer, charsmax(buffer));
 					trim(buffer);  
 //					dbg_log(8, "buffer: %s   isdigit: %i   groupCnt: %i  ", buffer, isdigit(buffer[0]), groupCnt);
 
@@ -1575,7 +1575,7 @@ vote_addFiller()
 			else
 			{
 				// we presume it's a listing of maps, ala mapcycle.txt
-				copy(fillerFile[0], sizeof(filename)-1, filename);
+				copy(fillerFile[0], charsmax(filename), filename);
 				mapsPerGroup[0] = 8;
 				groupCnt = 1;
 			}
@@ -1588,7 +1588,7 @@ vote_addFiller()
 	else
 	{
 		// we'll be loading all maps in the /maps folder
-		copy(fillerFile[0], sizeof(filename)-1, filename);
+		copy(fillerFile[0], charsmax(filename), filename);
 		mapsPerGroup[0] = 8;
 		groupCnt = 1;
 	}
@@ -1610,7 +1610,7 @@ vote_addFiller()
 			for (choiceIdx = 0; choiceIdx < allowedCnt; ++choiceIdx)
 			{
 				mapKey = random_num(0, mapCnt - 1);
-				ArrayGetString(g_fillerMap, mapKey, mapName, sizeof(mapName)-1);
+				ArrayGetString(g_fillerMap, mapKey, mapName, charsmax(mapName));
 				dbg_log(8, "[%i] choiceIdx: %i   allowedCnt: %i   mapKey: %i   mapName: %s", groupIdx, choiceIdx, allowedCnt, mapKey, mapName);
 				unsuccessfulCnt = 0;
 				
@@ -1621,7 +1621,7 @@ vote_addFiller()
 					{
 						mapKey = 0;
 					}
-					ArrayGetString(g_fillerMap, mapKey, mapName, sizeof(mapName)-1);
+					ArrayGetString(g_fillerMap, mapKey, mapName, charsmax(mapName));
 				}
 				
 				if (unsuccessfulCnt == mapCnt)
@@ -1691,7 +1691,7 @@ public vote_handleDisplay()
 	
 	if (get_pcvar_num(cvar_voteStatus) && get_pcvar_num(cvar_voteStatusType) == SHOWSTATUSTYPE_PERCENTAGE)
 	{
-		copy(g_voteTallyType, sizeof(g_voteTallyType)-1, "%");
+		copy(g_voteTallyType, charsmax(g_voteTallyType), "%");
 	}
 
 	if (get_cvar_num("gal_debug") & 4)
@@ -1771,20 +1771,20 @@ public vote_display(arg[3])
 		// add the header
 		if (isVoteOver)
 		{
-			charCnt = formatex(voteStatus, sizeof(voteStatus)-1, "%s%L^n", CLR_YELLOW, LANG_SERVER, "GAL_RESULT");
+			charCnt = formatex(voteStatus, charsmax(voteStatus), "%s%L^n", CLR_YELLOW, LANG_SERVER, "GAL_RESULT");
 		}
 		else
 		{
-			charCnt = formatex(voteStatus, sizeof(voteStatus)-1, "%s%L^n", CLR_YELLOW, LANG_SERVER, "GAL_CHOOSE");
+			charCnt = formatex(voteStatus, charsmax(voteStatus), "%s%L^n", CLR_YELLOW, LANG_SERVER, "GAL_CHOOSE");
 		}
 
 		// add maps to the menu
 		for (new choiceIdx = 0; choiceIdx < g_choiceCnt; ++choiceIdx)
 		{
 			voteCnt = g_mapVote[choiceIdx];
-			vote_getTallyStr(voteTally, sizeof(voteTally)-1, voteCnt);
+			vote_getTallyStr(voteTally, charsmax(voteTally), voteCnt);
 			
-			charCnt += formatex(voteStatus[charCnt], sizeof(voteStatus)-1-charCnt, "^n%s%i. %s%s%s", CLR_RED, choiceIdx+1, CLR_WHITE, g_mapChoice[choiceIdx], voteTally);
+			charCnt += formatex(voteStatus[charCnt], charsmax(voteStatus)-charCnt, "^n%s%i. %s%s%s", CLR_RED, choiceIdx+1, CLR_WHITE, g_mapChoice[choiceIdx], voteTally);
 			keys |= (1<<choiceIdx);
 		}
 	
@@ -1794,20 +1794,20 @@ public vote_display(arg[3])
 			// if it's not a runoff vote, add a space between the maps and the additional option
 			if (g_voteStatus & VOTE_IS_RUNOFF == 0)
 			{
-				charCnt += formatex(voteStatus[charCnt], sizeof(voteStatus)-1-charCnt, "^n");
+				charCnt += formatex(voteStatus[charCnt], charsmax(voteStatus)-charCnt, "^n");
 			}
 			
-			vote_getTallyStr(voteTally, sizeof(voteTally)-1, g_mapVote[g_choiceCnt]);
+			vote_getTallyStr(voteTally, charsmax(voteTally), g_mapVote[g_choiceCnt]);
 
 			if (allowExtend)
 			{
 				// add the "Extend Map" menu item.
-				charCnt += formatex(voteStatus[charCnt], sizeof(voteStatus)-1-charCnt, "^n%s%i. %s%L%s", CLR_RED, g_choiceCnt+1, CLR_WHITE, LANG_SERVER, "GAL_OPTION_EXTEND", g_currentMap, floatround(get_pcvar_float(cvar_extendmapStep)), voteTally);
+				charCnt += formatex(voteStatus[charCnt], charsmax(voteStatus)-charCnt, "^n%s%i. %s%L%s", CLR_RED, g_choiceCnt+1, CLR_WHITE, LANG_SERVER, "GAL_OPTION_EXTEND", g_currentMap, floatround(get_pcvar_float(cvar_extendmapStep)), voteTally);
 			}
 			else
 			{
 				// add the "Stay Here" menu item
-				charCnt += formatex(voteStatus[charCnt], sizeof(voteStatus)-1-charCnt, "^n%s%i. %s%L%s", CLR_RED, g_choiceCnt+1, CLR_WHITE, LANG_SERVER, "GAL_OPTION_STAY", voteTally);
+				charCnt += formatex(voteStatus[charCnt], charsmax(voteStatus)-charCnt, "^n%s%i. %s%L%s", CLR_RED, g_choiceCnt+1, CLR_WHITE, LANG_SERVER, "GAL_OPTION_STAY", voteTally);
 			}
 			
 			keys |= (1<<g_choiceCnt);
@@ -1816,13 +1816,13 @@ public vote_display(arg[3])
 		// make a copy of the virgin menu
 		if (g_vote[0] == 0)
 		{
-			new cleanCharCnt = copy(g_vote, sizeof(g_vote)-1, voteStatus);
+			new cleanCharCnt = copy(g_vote, charsmax(g_vote), voteStatus);
 			
 			// append a "None" option on for people to choose if they don't like any other choice
-			formatex(g_vote[cleanCharCnt], sizeof(g_vote)-1-cleanCharCnt, "^n^n%s0. %s%L", CLR_RED, CLR_WHITE, LANG_SERVER, "GAL_OPTION_NONE");
+			formatex(g_vote[cleanCharCnt], charsmax(g_vote)-cleanCharCnt, "^n^n%s0. %s%L", CLR_RED, CLR_WHITE, LANG_SERVER, "GAL_OPTION_NONE");
 		}
 		
-		charCnt += formatex(voteStatus[charCnt], sizeof(voteStatus)-1-charCnt, "^n^n");
+		charCnt += formatex(voteStatus[charCnt], charsmax(voteStatus)-charCnt, "^n^n");
 		
 		g_refreshVoteStatus = false;
 	}
@@ -1830,11 +1830,11 @@ public vote_display(arg[3])
 	static voteFooter[32];
 	if (updateTimeRemaining && get_pcvar_num(cvar_voteExpCountdown))
 	{
-		charCnt = copy(voteFooter, sizeof(voteFooter)-1, "^n^n");
+		charCnt = copy(voteFooter, charsmax(voteFooter), "^n^n");
 		
 		if (--g_voteDuration <= 10)
 		{
-			formatex(voteFooter[charCnt], sizeof(voteFooter)-1-charCnt, "%s%L: %s%i", CLR_GREY, LANG_SERVER, "GAL_TIMELEFT", CLR_RED, g_voteDuration);
+			formatex(voteFooter[charCnt], charsmax(voteFooter)-charCnt, "%s%L: %s%i", CLR_GREY, LANG_SERVER, "GAL_TIMELEFT", CLR_RED, g_voteDuration);
 		}
 	}
 	
@@ -1843,14 +1843,14 @@ public vote_display(arg[3])
 	menuClean[0] = 0;
 	menuDirty[0] = 0;
 	
-	formatex(menuClean, sizeof(menuClean)-1, "%s%s", g_vote, voteFooter);
+	formatex(menuClean, charsmax(menuClean), "%s%s", g_vote, voteFooter);
 	if (!isVoteOver)
 	{
-		formatex(menuDirty, sizeof(menuDirty)-1, "%s%s", voteStatus, voteFooter);
+		formatex(menuDirty, charsmax(menuDirty), "%s%s", voteStatus, voteFooter);
 	}
 	else
 	{
-		formatex(menuDirty, sizeof(menuDirty)-1, "%s^n^n%s%L", voteStatus, CLR_YELLOW, LANG_SERVER, "GAL_VOTE_ENDED");
+		formatex(menuDirty, charsmax(menuDirty), "%s^n^n%s%L", voteStatus, CLR_YELLOW, LANG_SERVER, "GAL_VOTE_ENDED");
 	}
 
 	new menuid, menukeys;
@@ -1967,7 +1967,7 @@ public vote_expire()
 		new voteTally[16];
 		for (new idxChoice = 0; idxChoice <= g_choiceCnt; ++idxChoice)
 		{
-			vote_getTallyStr(voteTally, sizeof(voteTally)-1, g_mapVote[idxChoice]);
+			vote_getTallyStr(voteTally, charsmax(voteTally), g_mapVote[idxChoice]);
 			dbg_log(4, "      %2i/%3i  %i. %s", g_mapVote[idxChoice], voteTally, idxChoice, g_mapChoice[idxChoice]);
 		}	
 		dbg_log(4, "");
@@ -2097,7 +2097,7 @@ public vote_expire()
 			if (get_pcvar_num(cvar_endOfMapVote))
 			{
 				new nextMap[32];
-				formatex(nextMap, sizeof(nextMap)-1, "%L", LANG_SERVER, "GAL_NEXTMAP_UNKNOWN");
+				formatex(nextMap, charsmax(nextMap), "%L", LANG_SERVER, "GAL_NEXTMAP_UNKNOWN");
 				map_setNext(nextMap);
 			}
 
@@ -2218,11 +2218,11 @@ prefix_isInMenu(map[])
 	{
 		new tentativePrefix[8], existingPrefix[8], junk[8];
 		
-		strtok(map, tentativePrefix, sizeof(tentativePrefix)-1, junk, sizeof(junk)-1, '_', 1);
+		strtok(map, tentativePrefix, charsmax(tentativePrefix), junk, charsmax(junk), '_', 1);
 		
 		for (new idxChoice = 0; idxChoice < g_choiceCnt; ++idxChoice)
 		{
-			strtok(g_mapChoice[idxChoice], existingPrefix, sizeof(existingPrefix)-1, junk, sizeof(junk)-1, '_', 1);
+			strtok(g_mapChoice[idxChoice], existingPrefix, charsmax(existingPrefix), junk, charsmax(junk), '_', 1);
 			
 			if (equal(tentativePrefix, existingPrefix))
 			{
@@ -2263,11 +2263,11 @@ public vote_handleChoice(id, key)
 		new name[32];
 		if (get_pcvar_num(cvar_voteAnnounceChoice))
 		{
-			get_user_name(id, name, sizeof(name)-1);
+			get_user_name(id, name, charsmax(name));
 		}
 
 		// dbg code ----
-		get_user_name(id, name, sizeof(name)-1);
+		get_user_name(id, name, charsmax(name));
 		//--------------
 
 		// confirm the player's choice
@@ -2362,7 +2362,7 @@ public map_change()
 	
 	// grab the name of the map we're changing to	
 	new map[MAX_MAPNAME_LEN + 1];
-	get_cvar_string("amx_nextmap", map, sizeof(map)-1);
+	get_cvar_string("amx_nextmap", map, charsmax(map));
 
 	// verify we're changing to a valid map
 	if (!is_map_valid(map))
@@ -2370,7 +2370,7 @@ public map_change()
 		// probably admin did something dumb like changed the map time limit below
 		// the time remaining in the map, thus making the map over immediately.
 		// since the next map is unknown, just restart the current map.
-		copy(map, sizeof(map)-1, g_currentMap);
+		copy(map, charsmax(map), g_currentMap);
 	}
 
 	// change to the map
@@ -2542,14 +2542,14 @@ map_listAll(id)
 	}
 
 	new command[32];
-	read_argv(0, command, sizeof(command)-1);
+	read_argv(0, command, charsmax(command));
 
 	new arg1[8], start;
 	new mapCount = get_pcvar_num(cvar_listmapsPaginate);
 
 	if (mapCount)
 	{
-		if (read_argv(1, arg1, sizeof(arg1)-1))
+		if (read_argv(1, arg1, charsmax(arg1)))
 		{
 			if (arg1[0] == '*')
 			{
@@ -2574,7 +2574,7 @@ map_listAll(id)
 			start = 1;
 		}
 	
-		if (id == 0 && read_argc() == 3 && read_argv(2, arg1, sizeof(arg1)-1))
+		if (id == 0 && read_argc() == 3 && read_argv(2, arg1, charsmax(arg1)))
 		{
 			mapCount = str_to_num(arg1);
 		}
@@ -2609,14 +2609,14 @@ map_listAll(id)
 		nominator_id = nomination_getPlayer(idx);
 		if (nominator_id)
 		{
-			get_user_name(nominator_id, name, sizeof(name)-1);
-			formatex(nominated, sizeof(nominated)-1, "%L", id, "GAL_NOMINATEDBY", name);
+			get_user_name(nominator_id, name, charsmax(name));
+			formatex(nominated, charsmax(nominated), "%L", id, "GAL_NOMINATEDBY", name);
 		}
 		else
 		{ 
 			nominated[0] = 0;
 		}
-		ArrayGetString(g_nominationMap, idx, mapName, sizeof(mapName)-1);
+		ArrayGetString(g_nominationMap, idx, mapName, charsmax(mapName));
 		con_print(id, "%3i: %s  %s", idx + 1, mapName, nominated);
 	}
 
@@ -2643,7 +2643,7 @@ map_listMatches(id, match[])
 
 	for (new idx = 1; idx <= g_nominationMapCnt; ++idx)
 	{
-		copy(mapName, sizeof(mapName)-1, g_nominationMap[idx]);
+		copy(mapName, charsmax(mapName), g_nominationMap[idx]);
 		strtolower(mapName);
 		
 		if (containi(mapName, match) > -1)
@@ -2651,8 +2651,8 @@ map_listMatches(id, match[])
 			nominator_id = nomination_getPlayer(idx);
 			if (nominator_id)
 			{
-				get_user_name(nominator_id, name, sizeof(name)-1);
-				formatex(nominated, sizeof(nominated)-1, "(nominated by %s)", name);
+				get_user_name(nominator_id, name, charsmax(name));
+				formatex(nominated, charsmax(nominated), "(nominated by %s)", name);
 			}
 			else
 			{
@@ -2667,7 +2667,7 @@ map_listMatches(id, match[])
 con_print(id, message[], {Float,Sql,Result,_}:...)
 {
 	new consoleMessage[256];
-	vformat(consoleMessage, sizeof(consoleMessage)-1, message, 3);
+	vformat(consoleMessage, charsmax(consoleMessage), message, 3);
 	
 	if (id)
 	{
@@ -2699,9 +2699,9 @@ public client_disconnect(id)
 		idxMap = g_nomination[id][idxNomination];
 		if (idxMap >= 0)
 		{
-			ArrayGetString(g_nominationMap, idxMap, mapName, sizeof(mapName)-1);
+			ArrayGetString(g_nominationMap, idxMap, mapName, charsmax(mapName));
 			nominationCnt++;
-			format(nominatedMaps, sizeof(nominatedMaps)-1, "%s%s, ", nominatedMaps, mapName);
+			format(nominatedMaps, charsmax(nominatedMaps), "%s%s, ", nominatedMaps, mapName);
 			g_nomination[id][idxNomination] = -1;
 		}
 	}
@@ -2766,7 +2766,7 @@ public srv_announceEarlyVote(id)
 	{
 		//client_print(id, print_chat, "%L", id, "GAL_VOTE_EARLY");
 		new text[101];
-		formatex(text, sizeof(text)-1, "^x04%L", id, "GAL_VOTE_EARLY");
+		formatex(text, charsmax(text), "^x04%L", id, "GAL_VOTE_EARLY");
 		print_color(id, text);
 	}
 }
@@ -2830,7 +2830,7 @@ nomination_clearAll()
 map_announceNomination(id, map[])
 {
 	new name[32];
-	get_user_name(id, name, sizeof(name)-1);
+	get_user_name(id, name, charsmax(name));
 	
 	client_print(0, print_chat, "%L", LANG_PLAYER, "GAL_NOM_SUCCESS", name, map);
 }
