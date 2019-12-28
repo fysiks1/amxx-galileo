@@ -121,7 +121,7 @@ new g_pNomBonusDivisor;
 
 public plugin_init()
 {
-	new const pluginVersion[] = "2.0.0"
+	new const pluginVersion[] = "2.1.0"
 	register_plugin("Galileo", pluginVersion, "Brad Jones/Fysiks");
 	
 	register_cvar("gal_version", pluginVersion, FCVAR_SERVER|FCVAR_SPONLY);
@@ -1301,28 +1301,37 @@ public nomination_list(id)
 	new msg[128], mapCnt;
 	new mapName[32];
 	
-	for( new i = 0; i < g_iNominatedMapsMaxIndex; i++ )
+	if( g_voteStatus & VOTE_IS_OVER )
 	{
-		if( IsValidNomination(i) ) // filter out maps that lost all its pre-votes
-		{
-			ArrayGetString(g_nominationMap, g_NominatedMaps[i][MapID], mapName, charsmax(mapName));
-			format(msg, charsmax(msg), "%s, %s(%d)", msg, mapName, g_NominatedMaps[i][Tally]);
-			
-			if (++mapCnt == 4)	// list 4 maps per chat line
-			{
-				client_print(0, print_chat, "%L: %s", LANG_PLAYER, "GAL_NOMINATIONS", msg[2]);
-				mapCnt = 0;
-				msg[0] = 0;
-			}
-		}
-	}
-	if (msg[0])
-	{
-		client_print(0, print_chat, "%L: %s", LANG_PLAYER, "GAL_NOMINATIONS", msg[2]);
+		// Nominations are not valid after the vote so display nextmap instead
+		get_cvar_string("amx_nextmap", mapName, charsmax(mapName));
+		client_print(0, print_chat, "%L", LANG_PLAYER, "GAL_NEXTMAP", mapName);
 	}
 	else
 	{
-		client_print(0, print_chat, "%L: %L", LANG_PLAYER, "GAL_NOMINATIONS", LANG_PLAYER, "NONE");
+		for( new i = 0; i < g_iNominatedMapsMaxIndex; i++ )
+		{
+			if( IsValidNomination(i) ) // filter out maps that lost all its pre-votes
+			{
+				ArrayGetString(g_nominationMap, g_NominatedMaps[i][MapID], mapName, charsmax(mapName));
+				format(msg, charsmax(msg), "%s, %s(%d)", msg, mapName, g_NominatedMaps[i][Tally]);
+				
+				if (++mapCnt == 4)	// list 4 maps per chat line
+				{
+					client_print(0, print_chat, "%L: %s", LANG_PLAYER, "GAL_NOMINATIONS", msg[2]);
+					mapCnt = 0;
+					msg[0] = 0;
+				}
+			}
+		}
+		if (msg[0])
+		{
+			client_print(0, print_chat, "%L: %s", LANG_PLAYER, "GAL_NOMINATIONS", msg[2]);
+		}
+		else
+		{
+			client_print(0, print_chat, "%L: %L", LANG_PLAYER, "GAL_NOMINATIONS", LANG_PLAYER, "NONE");
+		}
 	}
 }
 
