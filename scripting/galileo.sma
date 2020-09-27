@@ -121,7 +121,7 @@ new g_pNomBonusDivisor;
 
 public plugin_init()
 {
-	new const pluginVersion[] = "2.1.0"
+	new const pluginVersion[] = "2.2.0"
 	register_plugin("Galileo", pluginVersion, "Brad Jones/Fysiks");
 	
 	register_cvar("gal_version", pluginVersion, FCVAR_SERVER|FCVAR_SPONLY);
@@ -160,6 +160,7 @@ public plugin_init()
 
 	register_concmd("gal_startvote", "cmd_startVote", ADMIN_MAP);
 	register_concmd("gal_createmapfile", "cmd_createMapFile", ADMIN_RCON);
+	register_concmd("gal_addnommap", "cmdAddNomMap", ADMIN_RCON, "<mapname> - Adds a map to the nomination list for the current map.")
 
 	register_cvar("amx_nextmap", "", FCVAR_SERVER|FCVAR_EXTDLL|FCVAR_SPONLY);
 	cvar_extendmapMax				=	register_cvar("amx_extendmap_max", "90");
@@ -210,6 +211,29 @@ public plugin_init()
 	g_pNomBonusDivisor = register_cvar("gal_nominationbonus", "0");
 	
 	//set_task(1.0, "dbg_test",_,_,_,"a", 15);
+}
+
+public cmdAddNomMap(id, level, cid)
+{
+	if( !cmd_access(id, level, cid, 2) )
+	{
+		return PLUGIN_HANDLED
+	}
+
+	new szMap[32]
+	read_argv(1, szMap, charsmax(szMap))
+
+	if( is_map_valid(szMap) /* && !(already in list) */ )
+	{
+		ArrayPushString(g_nominationMap, szMap);
+		++g_nominationMapCnt;
+		console_print(id, "%s was added to the nomination list.", szMap)
+	}
+	else
+	{
+		console_print(id, "%s is not a valid map", szMap)
+	}
+	return PLUGIN_HANDLED
 }
 
 public dbg_fakeVotes()
