@@ -121,7 +121,7 @@ new g_pNomBonusDivisor;
 
 public plugin_init()
 {
-	new const pluginVersion[] = "2.2.0"
+	new const pluginVersion[] = "3.0.0"
 	register_plugin("Galileo", pluginVersion, "Brad Jones/Fysiks");
 	
 	register_cvar("gal_version", pluginVersion, FCVAR_SERVER|FCVAR_SPONLY);
@@ -2708,7 +2708,7 @@ con_print(id, message[], {Float,Sql,Result,_}:...)
 	server_print(consoleMessage);
 }
 
-public client_disconnect(id)
+public client_disconnected(id)
 {
 	g_voted[id] = false;
 		
