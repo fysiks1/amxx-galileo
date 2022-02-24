@@ -1,4 +1,4 @@
-new const PLUGIN_VERSION[]  = "1.1 $Revision: 290 $"; // $Date: 2009-02-26 11:20:25 -0500 (Thu, 26 Feb 2009) $;
+new const PLUGIN_VERSION[]  = "1.1 $Revision: f1 $"; // $Date: 2009-02-26 11:20:25 -0500 (Thu, 26 Feb 2009) $;
 
 #include <amxmodx>
 #include <amxmisc>
@@ -1381,11 +1381,19 @@ public vote_startDirector(bool:forced)
 			client_cmd(0, "spk ^"get red(e80) ninety(s45) to check(e20) use bay(s18) mass(e42) cap(s50)^"");
 		}
 
-		// announce the pending vote countdown from 7 to 1
-		set_task(1.0, "vote_countdownPendingVote", _, _, _, "a", 7);
+		if( g_voteStatus & VOTE_IS_RUNOFF )
+		{
+			// announce the pending vote countdown from 7 to 1
+			set_task(1.0, "vote_countdownPendingVote", _, _, _, "a", 7);
 
-		// display the map choices
-		set_task(8.5, "vote_handleDisplay");
+			// display the map choices
+			set_task(8.5, "vote_handleDisplay");
+		}
+		else
+		{
+			// display the map choices
+			set_task(1.0, "vote_handleDisplay");
+		}
 
 		// display the vote outcome 
 		if (get_pcvar_num(cvar_voteStatus))
